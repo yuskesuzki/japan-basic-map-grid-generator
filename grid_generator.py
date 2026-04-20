@@ -135,7 +135,6 @@ def make_grid(zone: int, level: int) -> None:
         zone (int): 平面直角座標系の系番号
         level (int): 地図情報レベル
     """
-    grid_gdf = gpd.GeoDataFrame([])
 
     code_list = []
     geometry_list = []
@@ -157,11 +156,13 @@ def make_grid(zone: int, level: int) -> None:
             pbar.update()
     pbar.close()
 
-    grid_gdf['code'] = code_list
-    grid_gdf['geometry'] = geometry_list
+    # リストから直接GeoDataFrameを作成する
+    grid_gdf = gpd.GeoDataFrame({
+        'code': code_list,
+        'geometry': geometry_list
+    })
 
     return grid_gdf
-
 
 def selected_land_area_grid(grid_gdf: gpd.GeoDataFrame, zone_land_area_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """生成した国土基本図の図郭
@@ -173,7 +174,7 @@ def selected_land_area_grid(grid_gdf: gpd.GeoDataFrame, zone_land_area_gdf: gpd.
     Returns:
         gpd.GeoDataFrame: _description_
     """
-    inp, _ = zone_land_area_gdf.sindex.query_bulk(grid_gdf.geometry, predicate='intersects')
+    inp, _ = zone_land_area_gdf.sindex.query(grid_gdf.geometry, predicate='intersects') # _bulk を削除
     grid_gdf['intersects'] = np.isin(np.arange(0, len(grid_gdf)), inp)
     land_area_grid_gdf = grid_gdf[grid_gdf['intersects']].reset_index(drop=True)
 
@@ -211,7 +212,7 @@ def main():
 
     # 図郭を生成したい系番号の領域だけ抽出
     zone_gdf = japanese_zone_gdf[japanese_zone_gdf['Zone'] == args.zone]
-    zone_gdf = zone_gdf.to_crs(epsg=int(zone_gdf['JGD2011']))
+    zone_gdf = zone_gdf.to_crs(epsg=int(zone_gdf['JGD2011'].iloc[0])) # .iloc[0] を追加
 
     # 国土基本図の図郭のGeoDataFrameを作成
     grid_gdf = make_grid(args.zone, args.level)
